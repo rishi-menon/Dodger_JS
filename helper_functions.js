@@ -1,6 +1,9 @@
 var mouse_pos_x;
 var mouse_pos_y;
 
+//percentage of height at which dampening region begins
+const multiplier_negative = 0.75;
+
 function Cal_Mouse_Pos (evt) {
     var rect = canvas.getBoundingClientRect ();
     var root = document.documentElement;
@@ -40,5 +43,12 @@ function Draw_Rect (x, y, l, b, col) {
 
 
 function Get_Next_Spawn_Time () {
-	return (Math.floor ((time_bw_spawns_max - time_bw_spawns_min)*Math.random()) + time_bw_spawns_min);
+	return Lerp (time_bw_spawns_min, time_bw_spawns_max, Math.random());
+}
+
+function Get_Multiplier (percent) {
+	//see desmos block game or try sketching graph to understand
+	//it gives a high value when percent is close to 0 and a negative value when percent is
+	// close to 1
+	return (1 - percent/multiplier_negative);
 }
