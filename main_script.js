@@ -13,7 +13,7 @@ var player_pos_y;
 var player_health;
 const player_size = 20;	//try to keep this even for good results ?
 const player_half_size = player_size/2;
-const player_starting_health = 100;
+const player_starting_health = 20;
 
 var player_alive = true;
 
@@ -23,8 +23,8 @@ var player_score = 1;
 //spawning time variables
 var next_spawn_time = 0;
 //in milliseconds
-const time_bw_spawns_min = 500;
-const time_bw_spawns_max = 3000;
+const time_bw_spawns_min = 100;
+const time_bw_spawns_max = 700;
 
 var master_block;
 
@@ -57,18 +57,25 @@ const go_x = 120;
 const go_y = 400;
 var go_alpha_percent = 0;
 
+//health regen variables
+const heal_time = 2; //time taken from last hit to start healing (in seconds)
+const heal_multiplier = 3;
+var heal_last_hit = 0; //time of last hit
+
 //block constants
 const block_prop = {
-	size_x_min: 10,
-	size_x_max: 20,
-	size_y_min: 5,
-	size_y_max: 10,
-	speed_x_min: -8,
-	speed_x_max: 8,
-	speed_y_min: 50,
-	speed_y_max: 200,
-	initial_col: 0x0000FF,
-	final_col: 0x00FFFF
+	size_x_min: 25,
+	size_x_max: 30,
+	size_y_min: 25,
+	size_y_max: 30,
+	speed_x_min: -30,
+	speed_x_max: 30,
+	speed_y_min: 200,
+	speed_y_max: 400,
+	initial_col: 0x00FFFF,
+	final_col: 0x0000FF,
+	initial_dmg: 5,
+	final_dmg: 30
 };
 
 
@@ -78,17 +85,6 @@ window.onload = function () {
 	ctx = canvas.getContext ("2d");
 	width = canvas.width;
 	height = canvas.height;
-
-
-	// console.log(block_prop.size_x_min);
-	// console.log(block_prop.size_x_max);
-	// console.log(block_prop.size_y_min);
-	// console.log(block_prop.size_y_max);
-	//
-	// console.log(block_prop.speed_x_min);
-	// console.log(block_prop.speed_x_max);
-	// console.log(block_prop.speed_y_min);
-	// console.log(block_prop.speed_y_max);
 
 	master_block = new Block (0, 0, 0, 0, 0, 0, 0, 0, 0);
 	Initialise_Game ();
@@ -119,6 +115,8 @@ function Initialise_Game () {
 	score_posy = score_posy_initial;
 	go_alpha_percent = 0;
 	player_score = 1;
+	heal_last_hit = 0;
+
 	master_block.Delete_All_Blocks ();
 }
 
@@ -173,8 +171,6 @@ function Fixed_Update () {
 	//clear screen
 	ctx.clearRect (0, 0, width, height);
 
-
-
 	////////////////////////////////////////////////////////////////
 	//MAIN LOGIC OF GAME
 	// - Move player
@@ -183,35 +179,60 @@ function Fixed_Update () {
 	// - check collision with player
 	// - check collision with bottom edge
 	// - draw blocks
+	////////////////////////////////////////////////////////////////
+
+	var curr_time = (new Date ()).getTime ();
 
 	//Play death animation and display game over text
 	if (!player_alive) {
 		Play_Death_Animation ();
 	} else {
+		//-------------------------------------------------------------------------------------------
+		//DRAW & MOVE PLAYER, INC SCORE, HEALTH
+
 		//draw player
 		Draw_Rect (player_pos_x - player_half_size, player_pos_y - player_half_size, player_size, player_size, 	hexa (0xAABB00, 1));
 		//move player
 		Move_Player ();
 
 		//INCREASE SCORE
-
+		//score should increase more if player is close to the top
 		//(1 - player_pos_y/(height * 0.8) gives a high value at the top
 		//0.8 so as to effectively decrease the height...
 		//so if player is really down, increment will be -ve
-		var increment = delta_time * 1.2 * (1 - player_pos_y/(height * 0.8));
-		player_score += increment;
+		var multiplier = Get_Multiplier (player_pos_y/height);
+		player_score += delta_time * multiplier;
 		if (player_score < 1)
 			player_score = 1;
+
+		//if player goes into dampening_effect region then dont heal, Also decrease health
+		if (player_pos_y >= multiplier_negative*height) {
+			heal_last_hit = curr_time;
+
+			player_health -= delta_time * heal_multiplier * 0.5;
+			if (player_health <= 0)
+				End_Game ();
+
+		}
+
+		//increment health if needbe
+		//heal time is in seconds
+		if (curr_time > heal_last_hit + heal_time*1000) {
+			player_health += delta_time * heal_multiplier;
+			if (player_health > player_starting_health)
+				player_health = player_starting_health;
+		}
+		//-------------------------------------------------------------------------------------------
 	}
 
 	//display score.... This has to be done after play death animation so that
 	//the score is displayed over the fading screen
 	Display_Score ();
 
+	//-------------------------------------------------------------------------------------------
+	//CREATE, MOVE, CHECK_BOTTOM EDGE FOR ALL BLOCKS
 	//Create a block even if player is dead
-	var curr_time = (new Date ()).getTime ();
 	if (curr_time > next_spawn_time) {
-		//create new block
 		master_block.Create_New_Block ();
 		next_spawn_time = curr_time + Get_Next_Spawn_Time ();
 	}
@@ -222,6 +243,10 @@ function Fixed_Update () {
 		//check if block goes out of screen
 		master_block.next.Check_Bottom_Edge ();
 	}
+	//-------------------------------------------------------------------------------------------
+
+	//-------------------------------------------------------------------------------------------
+	//CHECK COLLISION WITH PLAYER, DRAW BLOCKS
 
 	//a block might have been deleted so check again if blocks are left on screen
 	//only do if player is alive
@@ -231,6 +256,7 @@ function Fixed_Update () {
 		if (collision_block != null) {
 			//collision
 			player_health -= collision_block.damage;
+			heal_last_hit = curr_time;
 			collision_block.Delete_Block ();
 			if (player_health <= 0)
 				End_Game ();
@@ -240,16 +266,25 @@ function Fixed_Update () {
 	//a block might have been deleted so check again and draw
 	if (master_block.next != null)
 		master_block.next.Draw ();
+	//-------------------------------------------------------------------------------------------
 
-		//move and draw player and draw health bar if player is alive
+	//-------------------------------------------------------------------------------------------
+	//region to indicate when player begins losing points
+	Draw_Rect (0, multiplier_negative*height, width, (1-multiplier_negative)*height, hexa (0xE08888, 0.4));
+
+	// DRAW HEALTH, DAMP REGION
+	//move and draw player and draw health bar if player is alive
 	if (player_alive) {
-
+		Draw_Rect (0, height - health_thickness, width*(player_health/player_starting_health), health_thickness, hexa (health_col, 0.6));
 
 		//player_health/player_starting_health gives a percentage value
-		//score should increase more if player is close to the top
-		Draw_Rect (0, height - health_thickness, width*(player_health/player_starting_health), health_thickness, hexa (health_col, 0.6));
+		//print health
+		// ctx.font = "15px Arial";
+	    // ctx.fillStyle = "#333333";
+		// //x position shoul be center of health bar
+	    // ctx.fillText(player_health.toFixed(1), width*0.5*(player_health/player_starting_health), height);
 	}
-
+	//-------------------------------------------------------------------------------------------
 	//game logic over
 	////////////////////////////////////////////////////////////////////////
 }

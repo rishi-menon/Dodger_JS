@@ -1,4 +1,4 @@
-
+const dampening_effect = 0.35;
 
 function Block (pos_x, pos_y, len, breadth, sx, sy, damage, hex, alpha) {
 	this.col = hexa (hex, alpha);
@@ -14,9 +14,13 @@ function Block (pos_x, pos_y, len, breadth, sx, sy, damage, hex, alpha) {
 }
 
 Block.prototype.Move = function () {
-	this.x += this.sx * delta_time;
-	this.y += this.sy * delta_time;
-
+	if (this.y > multiplier_negative*height) {
+		this.x += this.sx * delta_time * dampening_effect;
+		this.y += this.sy * delta_time * dampening_effect;
+	} else {
+		this.x += this.sx * delta_time;
+		this.y += this.sy * delta_time;
+	}
 	if (this.next != null)
 		this.next.Move ();
 }
@@ -84,21 +88,17 @@ Block.prototype.Check_Bottom_Edge = function () {
 Block.prototype.Create_New_Block = function () {
 	//create random values for x_position, speed_x, y, length, breadth
 	if (this.next == null) {
-		var pos_x = Math.floor (0.8*width*Math.random()) + 0.1*width;
+		var pos_x = Lerp (0.05*width, 0.95*width, Math.random());
+		var len = Lerp (block_prop.size_x_min, block_prop.size_x_max, Math.random());
+		var breadth = Lerp (block_prop.size_y_min, block_prop.size_y_max, Math.random());
+		var speed_x = Lerp (block_prop.speed_x_min, block_prop.speed_x_max, Math.random());
+		var speed_y = Lerp (block_prop.speed_y_min, block_prop.speed_y_max, Math.random());
 
-		var len = Math.floor ((block_prop.size_x_max - block_prop.size_x_min)*Math.random()) + block_prop.size_x_min;
-
-		var breadth = Math.floor ((block_prop.size_y_max - block_prop.size_y_min)*Math.random()) + block_prop.size_y_min;
-
-		var speed_x = Math.floor ((block_prop.speed_x_max - block_prop.speed_x_min)*Math.random()) + block_prop.speed_x_min;
-
-		var speed_y = Math.floor ((block_prop.speed_y_max - block_prop.speed_y_min)*Math.random()) + block_prop.speed_y_min;
-
-		var hex = Lerp_Colour (block_prop.initial_col, block_prop.final_col, Math.random());
-		var damage = 10;
-
+		var rand_percent = Math.random();
+		var hex = Lerp_Colour (block_prop.initial_col, block_prop.final_col, rand_percent);
+		var damage = Math.floor (Lerp (block_prop.initial_dmg, block_prop.final_dmg, rand_percent));
 		// Block (pos_x, pos_y, len, breadth, sx, sy, damage, hex, alpha)
-		this.next = new Block (pos_x, 0, len, breadth, speed_x, speed_y, damage ,hex, 0.5);
+		this.next = new Block (pos_x, 0, len, breadth, speed_x, speed_y, damage, hex, 0.5);
 		this.next.prev = this;
 	} else {
 		this.next.Create_New_Block ();
