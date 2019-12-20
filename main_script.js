@@ -13,7 +13,7 @@ var player_pos_y;
 var player_health;
 const player_size = 20;	//try to keep this even for good results ?
 const player_half_size = player_size/2;
-const player_starting_health = 20;
+const player_starting_health = 50;
 
 var player_alive = true;
 
@@ -74,8 +74,8 @@ const block_prop = {
 	speed_y_max: 400,
 	initial_col: 0x00FFFF,
 	final_col: 0x0000FF,
-	initial_dmg: 5,
-	final_dmg: 30
+	initial_dmg: 20,
+	final_dmg: 50
 };
 
 
@@ -209,7 +209,7 @@ function Fixed_Update () {
 		if (player_pos_y >= multiplier_negative*height) {
 			heal_last_hit = curr_time;
 
-			player_health -= delta_time * heal_multiplier * 0.5;
+			player_health -= delta_time * heal_multiplier * 1.5;
 			if (player_health <= 0)
 				End_Game ();
 
