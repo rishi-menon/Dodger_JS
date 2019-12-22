@@ -1,4 +1,5 @@
 const dampening_effect = 0.35;
+const block_x_region = 1;//percent of region around player_x_pos
 
 function Block (pos_x, pos_y, len, breadth, sx, sy, damage, hex, alpha) {
 	this.col = hexa (hex, alpha);
@@ -88,7 +89,17 @@ Block.prototype.Check_Bottom_Edge = function () {
 Block.prototype.Create_New_Block = function () {
 	//create random values for x_position, speed_x, y, length, breadth
 	if (this.next == null) {
-		var pos_x = Lerp (0.05*width, 0.95*width, Math.random());
+
+		var pos_x_left = player_pos_x - block_x_region*width;
+		var pos_x_right = player_pos_x + block_x_region*width;
+
+		if (pos_x_left < 0)
+			pos_x_left = 0;
+		if (pos_x_right > width)
+			pos_x_right = width;
+
+		var pos_x = Lerp (pos_x_left, pos_x_right, Math.random());
+
 		var len = Lerp (block_prop.size_x_min, block_prop.size_x_max, Math.random());
 		var breadth = Lerp (block_prop.size_y_min, block_prop.size_y_max, Math.random());
 		var speed_x = Lerp (block_prop.speed_x_min, block_prop.speed_x_max, Math.random());
@@ -98,7 +109,7 @@ Block.prototype.Create_New_Block = function () {
 		var hex = Lerp_Colour (block_prop.initial_col, block_prop.final_col, rand_percent);
 		var damage = Math.floor (Lerp (block_prop.initial_dmg, block_prop.final_dmg, rand_percent));
 		// Block (pos_x, pos_y, len, breadth, sx, sy, damage, hex, alpha)
-		this.next = new Block (pos_x, 0, len, breadth, speed_x, speed_y, damage, hex, 0.5);
+		this.next = new Block (pos_x, 0, len, breadth, speed_x, speed_y, damage, hex, 0.9);
 		this.next.prev = this;
 	} else {
 		this.next.Create_New_Block ();

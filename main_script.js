@@ -1,11 +1,13 @@
 //canvas variables
-var canvas;
-var ctx;
-var width;
-var height;
+const canvas = document.getElementById ("myCanvas");
+const ctx = canvas.getContext ("2d");
+const width = canvas.width;
+const height = canvas.height;
 
 const fps = 40;
 const delta_time = 1/fps;
+
+const wait_time_to_start = 1000; //in milliseconds
 
 //coordinates of center of player
 var player_pos_x;
@@ -19,17 +21,21 @@ var player_alive = true;
 
 var player_score = 1;
 
+var starting_instructions = true;
+
 
 //spawning time variables
 var next_spawn_time = 0;
 //in milliseconds
-const time_bw_spawns_min = 100;
-const time_bw_spawns_max = 700;
+const time_bw_spawns_min = 150;
+const time_bw_spawns_max = 600;
 
 var master_block;
 
 //health bar
-const health_col = 0xff2222;
+const health_col = 0x00ee00;
+const health_col_dying = 0xee0000;
+const health_col_outline = 0xffdddd;
 const health_thickness = 15;
 
 //animation variables
@@ -42,19 +48,19 @@ var screen_alpha_percent = 0;
 
 //animation_score variable
 const score_posy_initial = 40;
-const score_posy_final = 300;
+const score_posy_final = 0.45*height;
 const score_animation_time = 0.9;	//in seconds
 var score_percent = 0;
 var score_posy = score_posy_initial;
-const score_posx = 200;
+const score_posx = 0.5*width;
 
 //game over text
 const go_alpha_final = 0.8;
 const go_alpha_initial = 0;
 const go_animation_time = 0.9;	//in seconds
 const go_text_col = 0xeeee11;
-const go_x = 120;
-const go_y = 400;
+const go_x = 0.35*width;
+const go_y = 0.5*height;
 var go_alpha_percent = 0;
 
 //health regen variables
@@ -63,34 +69,40 @@ const heal_multiplier = 3;
 var heal_last_hit = 0; //time of last hit
 
 //block constants
+// 0x00FFFF initial
+//0x0000FF final
+
+// 0x00ee77
+// 0x0096F4
+
 const block_prop = {
 	size_x_min: 25,
-	size_x_max: 30,
+	size_x_max: 40,
 	size_y_min: 25,
-	size_y_max: 30,
+	size_y_max: 40,
 	speed_x_min: -30,
 	speed_x_max: 30,
-	speed_y_min: 200,
-	speed_y_max: 400,
-	initial_col: 0x00FFFF,
-	final_col: 0x0000FF,
-	initial_dmg: 20,
+	speed_y_min: 250,
+	speed_y_max: 550,
+	initial_col: 0x00ee77,
+	final_col: 0x0096F4,
+	initial_dmg: 10,
 	final_dmg: 50
 };
 
 
 window.onload = function () {
 	//initialise canvas variables
-	canvas = document.getElementById ("myCanvas");
-	ctx = canvas.getContext ("2d");
-	width = canvas.width;
-	height = canvas.height;
 
 	master_block = new Block (0, 0, 0, 0, 0, 0, 0, 0, 0);
 	Initialise_Game ();
+
 	setInterval (Fixed_Update, 1000 * delta_time);
 
-	canvas.addEventListener ("mousemove", Cal_Mouse_Pos);
+	canvas.addEventListener ("mousemove", function (evt) {
+			starting_instructions = false;
+			Cal_Mouse_Pos (evt);
+	});
 
 	document.addEventListener ("keydown", function(evt) {
 		if (!player_alive && evt.keyCode == 32) {
@@ -102,9 +114,9 @@ window.onload = function () {
 
 function Initialise_Game () {
 	player_pos_x = 0.5*width;
-	player_pos_y = 0.8*height;
+	player_pos_y = 0.7*height;
 	mouse_pos_x = 0.5*width;
-	mouse_pos_y = 0.8*height;
+	mouse_pos_y = 0.7*height;
 	next_spawn_time = 0;
 	player_alive = true;
 	player_health = player_starting_health;
@@ -117,6 +129,7 @@ function Initialise_Game () {
 	player_score = 1;
 	heal_last_hit = 0;
 
+	starting_instructions = true;
 	master_block.Delete_All_Blocks ();
 }
 
@@ -209,7 +222,7 @@ function Fixed_Update () {
 		if (player_pos_y >= multiplier_negative*height) {
 			heal_last_hit = curr_time;
 
-			player_health -= delta_time * heal_multiplier * 1.5;
+			player_health -= delta_time * heal_multiplier;
 			if (player_health <= 0)
 				End_Game ();
 
@@ -228,12 +241,22 @@ function Fixed_Update () {
 	//display score.... This has to be done after play death animation so that
 	//the score is displayed over the fading screen
 	Display_Score ();
+	if (starting_instructions) {
+		ctx.font = "25px Arial";
+		ctx.fillStyle = "#ff2288";
+		player_score = 0;
+		ctx.fillText("Use mouse to move", 0.3*width, score_posy_initial + 30);
+	}
 
 	//-------------------------------------------------------------------------------------------
 	//CREATE, MOVE, CHECK_BOTTOM EDGE FOR ALL BLOCKS
 	//Create a block even if player is dead
-	if (curr_time > next_spawn_time) {
-		master_block.Create_New_Block ();
+	if (curr_time > next_spawn_time && !starting_instructions) {
+		//create 2 to 4 blocks at a time
+		var num_blocks = Math.floor (2*Math.random ()) + 2;
+		for (var i = 0; i < num_blocks; i++) {
+			master_block.Create_New_Block ();
+		}
 		next_spawn_time = curr_time + Get_Next_Spawn_Time ();
 	}
 
@@ -255,8 +278,12 @@ function Fixed_Update () {
 		var collision_block = master_block.next.Check_Collision (player_pos_x, player_pos_y, player_half_size);
 		if (collision_block != null) {
 			//collision
-			player_health -= collision_block.damage;
-			heal_last_hit = curr_time;
+			//decrease health only if player is in undamped region
+			if (player_pos_y < multiplier_negative*height) {
+				player_health -= collision_block.damage;
+			} else {
+				heal_last_hit = curr_time;
+			}
 			collision_block.Delete_Block ();
 			if (player_health <= 0)
 				End_Game ();
@@ -275,14 +302,22 @@ function Fixed_Update () {
 	// DRAW HEALTH, DAMP REGION
 	//move and draw player and draw health bar if player is alive
 	if (player_alive) {
-		Draw_Rect (0, height - health_thickness, width*(player_health/player_starting_health), health_thickness, hexa (health_col, 0.6));
+		//draw outline
+		Draw_Rect (0, height - health_thickness, width, health_thickness, hexa (health_col_outline, 0.6));
+
+		//draw actual health
+		if (player_pos_y > multiplier_negative*height) {
+			Draw_Rect (0, height - health_thickness, width*(player_health/player_starting_health), health_thickness, hexa (health_col_dying, 0.6));
+		} else {
+			Draw_Rect (0, height - health_thickness, width*(player_health/player_starting_health), health_thickness, hexa (health_col, 0.6));
+		}
 
 		//player_health/player_starting_health gives a percentage value
 		//print health
-		// ctx.font = "15px Arial";
-	    // ctx.fillStyle = "#333333";
-		// //x position shoul be center of health bar
-	    // ctx.fillText(player_health.toFixed(1), width*0.5*(player_health/player_starting_health), height);
+		ctx.font = "15px Arial";
+	    ctx.fillStyle = "#333333";
+		//x position shoul be center of health bar
+	    ctx.fillText((100*player_health/player_starting_health).toFixed(0) + "%", width*0.9, height - health_thickness*0.1);
 	}
 	//-------------------------------------------------------------------------------------------
 	//game logic over
@@ -291,6 +326,13 @@ function Fixed_Update () {
 
 function Display_Score () {
 	ctx.font = "25px Arial";
-    ctx.fillStyle = "#00b049";
+	if (player_pos_y >= multiplier_negative*height) {
+    	ctx.fillStyle = "#b00049";
+
+	} else if (player_pos_y < 0.3*height) {
+		    ctx.fillStyle = "#FFF356";
+	} else {
+    	ctx.fillStyle = "#00b049";
+	}
     ctx.fillText(player_score.toFixed(2), score_posx, score_posy);
 }

@@ -1,8 +1,10 @@
 #myCanvas {
-	background: #666666;
+	/* 666666 */
+	background: #333333;
 	padding: 0;
 	display: block;
 	margin: 0 auto;
+	/* cursor: none; */
 
 }
 
