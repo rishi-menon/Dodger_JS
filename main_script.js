@@ -7,8 +7,6 @@ const height = canvas.height;
 const fps = 40;
 const delta_time = 1/fps;
 
-const wait_time_to_start = 1000; //in milliseconds
-
 //coordinates of center of player
 var player_pos_x;
 var player_pos_y;
